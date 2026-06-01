@@ -1,0 +1,1534 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FLOOD·GUARD — Dashboard IoT</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700;900&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #040d0a;
+    --bg2:       #071410;
+    --bg3:       #0a1c18;
+    --panel:     #0d2018;
+    --border:    #143326;
+    --border2:   #1e4a35;
+    --green:     #00e87a;
+    --green2:    #00b85f;
+    --green3:    #006633;
+    --cyan:      #00fff0;
+    --cyan2:     #00c8c0;
+    --yellow:    #ffe040;
+    --orange:    #ff8c00;
+    --red:       #ff2040;
+    --red2:      #cc0020;
+    --blue:      #0088ff;
+    --blue2:     #004488;
+    --magenta:   #ff00cc;
+    --gray:      #3a5a48;
+    --gray2:     #2a3f33;
+    --white:     #e8f4f0;
+    --text:      #9fc4b0;
+    --text2:     #5a8070;
+    --font-mono: 'Share Tech Mono', monospace;
+    --font-cond: 'Barlow Condensed', sans-serif;
+    --font-body: 'Barlow', sans-serif;
+  }
+
+  /* ════ TEMA CLARO ════ */
+  :root.light {
+    --bg:        #f0f7f4;
+    --bg2:       #e4f0eb;
+    --bg3:       #d8ece3;
+    --panel:     #ffffff;
+    --border:    #b8d9c8;
+    --border2:   #7ab99a;
+    --green:     #007a40;
+    --green2:    #009950;
+    --green3:    #ccf0de;
+    --cyan:      #006e8a;
+    --cyan2:     #008aaa;
+    --yellow:    #b07000;
+    --orange:    #b05000;
+    --red:       #cc0020;
+    --red2:      #990018;
+    --blue:      #0055cc;
+    --blue2:     #cce0ff;
+    --magenta:   #990099;
+    --gray:      #6a8a78;
+    --gray2:     #c8ddd4;
+    --white:     #0d2018;
+    --text:      #2a5040;
+    --text2:     #5a8070;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--white);
+    font-family: var(--font-body);
+    min-height: 100vh;
+    overflow-x: hidden;
+    transition: background .35s, color .35s;
+  }
+
+  /* ── GRID NOISE BACKGROUND ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0;
+    background-image:
+      linear-gradient(rgba(0,232,122,.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,232,122,.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    transition: opacity .35s;
+  }
+  :root.light body::before {
+    background-image:
+      linear-gradient(rgba(0,120,60,.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,120,60,.06) 1px, transparent 1px);
+  }
+
+  /* Logo glow: desativa no tema claro */
+  :root.light .logo-flood {
+    text-shadow: none;
+    color: var(--green);
+  }
+
+  .app { position: relative; z-index: 1; max-width: 1400px; margin: 0 auto; padding: 0 20px 40px; }
+
+  /* Transição suave em todos os painéis */
+  .panel, .kpi, .connect-bar, .conn-badge, .conn-card,
+  .log-wrap, .log-entry, .s-bar-track, header, .tank-outer,
+  .field input, .btn-cmd, .risk-bar-track {
+    transition: background .35s, border-color .35s, color .35s, box-shadow .35s;
+  }
+
+  /* ════════════════ HEADER ════════════════ */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 0 16px;
+    border-bottom: 1px solid var(--border2);
+    margin-bottom: 24px;
+  }
+  .logo {
+    display: flex; align-items: baseline; gap: 2px;
+  }
+  .logo-flood {
+    font-family: var(--font-cond); font-weight: 900; font-size: 2.2rem;
+    letter-spacing: -.01em; color: var(--green);
+    text-shadow: 0 0 20px rgba(0,232,122,.5);
+  }
+  .logo-dot { color: var(--cyan); font-size: 2.2rem; font-weight: 900; }
+  .logo-guard {
+    font-family: var(--font-cond); font-weight: 300; font-size: 2.2rem;
+    letter-spacing: .1em; color: var(--cyan);
+  }
+  .logo-sub {
+    font-family: var(--font-mono); font-size: .65rem;
+    color: var(--text2); letter-spacing: .15em;
+    margin-top: 2px;
+  }
+
+  .header-right { display: flex; align-items: center; gap: 20px; }
+
+  .conn-badge {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 14px;
+    border: 1px solid var(--border2);
+    border-radius: 2px;
+    font-family: var(--font-mono); font-size: .7rem;
+    letter-spacing: .1em;
+    transition: all .3s;
+  }
+  .conn-badge .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--gray); transition: all .3s;
+  }
+  .conn-badge.wifi-ok .dot { background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+  .conn-badge.mqtt-ok .dot { background: var(--blue); box-shadow: 0 0 8px var(--blue); }
+  .conn-badge.offline .dot { background: var(--magenta); box-shadow: 0 0 8px var(--magenta); }
+  .conn-badge.wifi-ok { border-color: var(--cyan2); color: var(--cyan); }
+  .conn-badge.mqtt-ok { border-color: var(--blue); color: var(--blue); }
+  .conn-badge.offline { border-color: var(--magenta); color: var(--magenta); }
+
+  #clock {
+    font-family: var(--font-mono); font-size: .9rem;
+    color: var(--text2); letter-spacing: .1em;
+  }
+
+  /* ════════════════ CONNECT BAR ════════════════ */
+  .connect-bar {
+    display: flex; gap: 12px; align-items: flex-end;
+    background: var(--panel);
+    border: 1px solid var(--border2);
+    padding: 14px 18px; margin-bottom: 24px;
+    border-radius: 2px;
+  }
+  .field { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+  .field label {
+    font-family: var(--font-mono); font-size: .6rem;
+    color: var(--text2); letter-spacing: .12em; text-transform: uppercase;
+  }
+  .field input {
+    background: var(--bg3); border: 1px solid var(--border2);
+    color: var(--white); font-family: var(--font-mono); font-size: .8rem;
+    padding: 7px 10px; border-radius: 2px; outline: none;
+    transition: border-color .2s;
+  }
+  .field input:focus { border-color: var(--green); }
+  .field.small { max-width: 80px; }
+  .field.medium { max-width: 160px; }
+
+  .btn {
+    font-family: var(--font-cond); font-weight: 700; font-size: .9rem;
+    letter-spacing: .1em; text-transform: uppercase;
+    padding: 8px 20px; border: none; border-radius: 2px;
+    cursor: pointer; transition: all .2s;
+  }
+  .btn-connect {
+    background: var(--green3); color: var(--green);
+    border: 1px solid var(--green2);
+  }
+  .btn-connect:hover { background: var(--green2); color: var(--bg); }
+  .btn-connect.connected { background: var(--red2); color: var(--red); border-color: var(--red); }
+  .btn-connect.connected:hover { background: var(--red); color: #fff; }
+
+  /* ════════════════ ALERT BANNER ════════════════ */
+  #alert-banner {
+    display: none;
+    padding: 12px 20px; margin-bottom: 20px;
+    border-radius: 2px; border-left: 4px solid;
+    font-family: var(--font-cond); font-weight: 700;
+    font-size: 1.1rem; letter-spacing: .05em;
+  }
+  #alert-banner.normal { display: none; }
+  #alert-banner.alerta {
+    display: flex; align-items: center; gap: 12px;
+    background: rgba(255,224,64,.08); border-color: var(--yellow); color: var(--yellow);
+    animation: pulse-bg 1s ease-in-out infinite alternate;
+  }
+  #alert-banner.critico {
+    display: flex; align-items: center; gap: 12px;
+    background: rgba(255,32,64,.12); border-color: var(--red); color: var(--red);
+    animation: pulse-bg-red 0.6s ease-in-out infinite alternate;
+  }
+  @keyframes pulse-bg { from { background: rgba(255,224,64,.04); } to { background: rgba(255,224,64,.12); } }
+  @keyframes pulse-bg-red { from { background: rgba(255,32,64,.06); } to { background: rgba(255,32,64,.18); } }
+
+  /* ════════════════ KPI ROW ════════════════ */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px; margin-bottom: 20px;
+  }
+  @media (max-width: 900px) { .kpi-row { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 600px) { .kpi-row { grid-template-columns: repeat(2, 1fr); } }
+
+  .kpi {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-top: 2px solid var(--border2);
+    padding: 14px 16px 12px;
+    position: relative; overflow: hidden;
+    transition: border-color .3s;
+  }
+  .kpi::after {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent, var(--green)), transparent);
+    opacity: .6;
+  }
+  .kpi-label {
+    font-family: var(--font-mono); font-size: .6rem;
+    color: var(--text2); letter-spacing: .15em; text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .kpi-value {
+    font-family: var(--font-cond); font-weight: 700;
+    font-size: 2.2rem; line-height: 1;
+    color: var(--accent, var(--green));
+    transition: color .3s;
+  }
+  .kpi-unit {
+    font-family: var(--font-mono); font-size: .65rem;
+    color: var(--text2); margin-left: 4px;
+  }
+  .kpi-sub {
+    font-family: var(--font-mono); font-size: .6rem;
+    color: var(--text2); margin-top: 4px;
+  }
+
+  /* ════════════════ MAIN GRID ════════════════ */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 300px 1fr 260px;
+    gap: 16px; margin-bottom: 16px;
+  }
+  @media (max-width: 1100px) {
+    .main-grid { grid-template-columns: 1fr 1fr; }
+    .main-grid .panel-chart { grid-column: 1 / -1; }
+  }
+  @media (max-width: 700px) {
+    .main-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ════════════════ PANELS ════════════════ */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 18px;
+  }
+  .panel-title {
+    font-family: var(--font-cond); font-weight: 700;
+    font-size: .75rem; letter-spacing: .2em; text-transform: uppercase;
+    color: var(--text2); margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .panel-title::before {
+    content: ''; width: 3px; height: 14px;
+    background: var(--accent-line, var(--green));
+    display: block;
+  }
+
+  /* ════════════════ TANQUE / NÍVEL ════════════════ */
+  .tank-wrap {
+    display: flex; gap: 20px; align-items: flex-end;
+  }
+  .tank {
+    width: 70px; flex-shrink: 0;
+    position: relative;
+  }
+  .tank-outer {
+    width: 70px; height: 200px;
+    border: 2px solid var(--border2);
+    border-radius: 3px; position: relative;
+    overflow: hidden; background: var(--bg);
+  }
+  .tank-fill {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: linear-gradient(to top, var(--fill-color, var(--green)), rgba(0,232,122,.3));
+    transition: height .8s cubic-bezier(.4,0,.2,1), background .5s;
+    height: 0%;
+  }
+  .tank-fill::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: white; opacity: .3;
+    animation: wave 2s linear infinite;
+  }
+  @keyframes wave {
+    0%   { transform: scaleX(1) translateX(0); }
+    50%  { transform: scaleX(1.05) translateX(-2px); }
+    100% { transform: scaleX(1) translateX(0); }
+  }
+  .tank-mark {
+    position: absolute; right: -18px;
+    font-family: var(--font-mono); font-size: .55rem;
+    color: var(--text2);
+    display: flex; align-items: center; gap: 4px;
+  }
+  .tank-mark::before {
+    content: ''; width: 14px; height: 1px;
+    background: currentColor; display: block;
+  }
+  .tank-mark.warn { color: var(--yellow); }
+  .tank-mark.crit { color: var(--red); }
+
+  .tank-info { flex: 1; }
+  .nivel-big {
+    font-family: var(--font-cond); font-weight: 900;
+    font-size: 4.5rem; line-height: 1;
+    color: var(--fill-color, var(--green));
+    transition: color .5s;
+    text-shadow: 0 0 30px currentColor;
+  }
+  .nivel-pct { font-size: 2rem; opacity: .7; }
+  .nivel-label {
+    font-family: var(--font-mono); font-size: .65rem;
+    color: var(--text2); letter-spacing: .12em;
+    margin-top: 4px; margin-bottom: 16px;
+  }
+  .dist-val {
+    font-family: var(--font-mono); font-size: 1.1rem;
+    color: var(--cyan); margin-bottom: 12px;
+  }
+
+  /* ── Barra de risco ── */
+  .risk-bar-wrap { margin-top: 8px; }
+  .risk-bar-label {
+    font-family: var(--font-mono); font-size: .6rem;
+    color: var(--text2); letter-spacing: .1em; margin-bottom: 5px;
+  }
+  .risk-bar-track {
+    height: 8px; background: var(--bg3);
+    border: 1px solid var(--border2); border-radius: 1px;
+    overflow: hidden; position: relative;
+  }
+  .risk-bar-fill {
+    height: 100%; width: 0%;
+    transition: width .8s cubic-bezier(.4,0,.2,1), background .5s;
+    border-radius: 1px;
+  }
+  .risk-zones {
+    display: flex; margin-top: 3px;
+    font-family: var(--font-mono); font-size: .55rem;
+  }
+  .risk-z { flex: 1; text-align: center; }
+  .risk-z.ok { color: var(--green2); }
+  .risk-z.warn { color: var(--yellow); }
+  .risk-z.crit { color: var(--red); }
+
+  /* ════════════════ GRÁFICO ════════════════ */
+  .panel-chart { }
+  .chart-container { position: relative; height: 220px; }
+  canvas { width: 100% !important; }
+
+  /* ════════════════ SEMÁFORO + STATUS ════════════════ */
+  .semaforo {
+    display: flex; flex-direction: column;
+    align-items: center; gap: 16px;
+  }
+  .sem-light {
+    width: 60px; height: 60px; border-radius: 50%;
+    background: var(--bg3); border: 2px solid var(--border2);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-mono); font-size: .55rem;
+    color: var(--text2); transition: all .3s;
+    position: relative;
+  }
+  .sem-light.active {
+    border-color: var(--light-color);
+    box-shadow: 0 0 20px var(--light-color), 0 0 40px var(--light-color);
+    background: radial-gradient(circle, var(--light-color) 0%, rgba(0,0,0,.4) 100%);
+    color: var(--bg);
+    font-weight: 700;
+  }
+  .sem-light.red { --light-color: var(--red); }
+  .sem-light.yellow { --light-color: var(--yellow); }
+  .sem-light.green { --light-color: var(--green); }
+
+  .status-text {
+    font-family: var(--font-cond); font-weight: 900;
+    font-size: 1.4rem; letter-spacing: .08em;
+    text-align: center; margin-top: 8px;
+    transition: color .3s;
+  }
+
+  .rgb-indicator {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 6px; margin-top: 12px;
+    padding-top: 12px; border-top: 1px solid var(--border);
+  }
+  .rgb-label {
+    font-family: var(--font-mono); font-size: .58rem;
+    color: var(--text2); letter-spacing: .1em;
+  }
+  .rgb-dot {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: var(--gray); transition: all .4s;
+    border: 1px solid var(--border2);
+  }
+  .rgb-mode-text {
+    font-family: var(--font-mono); font-size: .6rem;
+    color: var(--text2); letter-spacing: .08em;
+    text-align: center;
+  }
+
+  /* ════════════════ BOTTOM GRID ════════════════ */
+  .bottom-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 900px) { .bottom-grid { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 600px) { .bottom-grid { grid-template-columns: 1fr; } }
+
+  /* ── Sensor row ── */
+  .sensor-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 0; border-bottom: 1px solid var(--border);
+  }
+  .sensor-row:last-child { border-bottom: none; }
+  .s-icon {
+    width: 28px; height: 28px; border-radius: 2px;
+    background: var(--bg3); border: 1px solid var(--border2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: .75rem; flex-shrink: 0;
+  }
+  .s-info { flex: 1; }
+  .s-name {
+    font-family: var(--font-mono); font-size: .58rem;
+    color: var(--text2); letter-spacing: .08em;
+  }
+  .s-bar-track {
+    height: 4px; background: var(--bg3);
+    border-radius: 2px; margin-top: 3px; overflow: hidden;
+  }
+  .s-bar-fill {
+    height: 100%; border-radius: 2px;
+    transition: width .6s ease;
+  }
+  .s-val {
+    font-family: var(--font-mono); font-size: .75rem;
+    color: var(--accent2, var(--cyan)); text-align: right;
+    min-width: 50px;
+  }
+
+  /* ── Log MQTT ── */
+  .log-wrap {
+    height: 180px; overflow-y: auto;
+    background: var(--bg); border: 1px solid var(--border);
+    padding: 8px 10px;
+    font-family: var(--font-mono); font-size: .65rem;
+    scroll-behavior: smooth;
+  }
+  .log-wrap::-webkit-scrollbar { width: 4px; }
+  .log-wrap::-webkit-scrollbar-track { background: var(--bg); }
+  .log-wrap::-webkit-scrollbar-thumb { background: var(--border2); }
+  .log-entry {
+    padding: 2px 0; border-bottom: 1px solid var(--border);
+    display: grid; grid-template-columns: 80px 1fr;
+    gap: 8px; color: var(--text2); animation: fadeIn .3s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  .log-entry .log-time { color: var(--green3); }
+  .log-entry .log-msg  { color: var(--text); }
+  .log-entry.pub .log-msg { color: var(--blue); }
+  .log-entry.alert .log-msg { color: var(--yellow); }
+  .log-entry.crit .log-msg  { color: var(--red); }
+  .log-entry.conn .log-msg  { color: var(--green); }
+
+  /* ── WiFi/MQTT status cards ── */
+  .conn-grid {
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .conn-card {
+    background: var(--bg3); border: 1px solid var(--border2);
+    padding: 10px 12px; border-radius: 2px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .conn-card-label {
+    font-family: var(--font-mono); font-size: .62rem;
+    color: var(--text2); letter-spacing: .1em;
+  }
+  .conn-card-val {
+    font-family: var(--font-mono); font-size: .72rem;
+    font-weight: 600;
+  }
+  .pill {
+    padding: 2px 8px; border-radius: 10px;
+    font-family: var(--font-mono); font-size: .6rem;
+    font-weight: 700; letter-spacing: .05em;
+  }
+  .pill.ok    { background: rgba(0,232,122,.15); color: var(--green); border: 1px solid var(--green3); }
+  .pill.warn  { background: rgba(255,224,64,.1); color: var(--yellow); border: 1px solid rgba(255,224,64,.3); }
+  .pill.err   { background: rgba(255,0,204,.1); color: var(--magenta); border: 1px solid rgba(255,0,204,.3); }
+  .pill.blue  { background: rgba(0,136,255,.15); color: var(--blue); border: 1px solid var(--blue2); }
+
+  /* ── Command panel ── */
+  .cmd-row {
+    display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap;
+  }
+  .btn-cmd {
+    font-family: var(--font-mono); font-size: .65rem;
+    letter-spacing: .08em; text-transform: uppercase;
+    padding: 6px 14px; border-radius: 2px;
+    cursor: pointer; transition: all .2s;
+    background: var(--bg3); border: 1px solid var(--border2);
+    color: var(--text);
+  }
+  .btn-cmd:hover { border-color: var(--green); color: var(--green); }
+  .btn-cmd.danger:hover { border-color: var(--red); color: var(--red); }
+
+  /* ── Uptime / pub count ── */
+  .stat-mini {
+    display: flex; justify-content: space-between;
+    padding: 6px 0; border-bottom: 1px solid var(--border);
+    font-family: var(--font-mono); font-size: .65rem;
+  }
+  .stat-mini:last-child { border-bottom: none; }
+  .stat-mini-label { color: var(--text2); }
+  .stat-mini-val   { color: var(--white); }
+
+  /* ── No data banner (não bloqueia mais) ── */
+  #no-data {
+    display: flex; align-items: center; gap: 14px;
+    background: var(--panel);
+    border: 1px solid var(--border2);
+    border-left: 3px solid var(--green2);
+    padding: 12px 18px; margin-bottom: 16px;
+    border-radius: 2px;
+  }
+  #no-data.hidden { display: none; }
+  .no-data-icon { font-size: 1.4rem; }
+  .no-data-title {
+    font-family: var(--font-cond); font-weight: 700;
+    font-size: 1rem; color: var(--green); letter-spacing: .08em;
+  }
+  .no-data-sub {
+    font-family: var(--font-mono); font-size: .65rem;
+    color: var(--text2); letter-spacing: .05em; line-height: 1.5;
+  }
+
+  /* ── Responsive tweaks ── */
+  @media (max-width: 700px) {
+    .connect-bar { flex-wrap: wrap; }
+    .kpi-value { font-size: 1.6rem; }
+    .nivel-big { font-size: 3rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- HEADER -->
+  <header>
+    <div>
+      <div class="logo">
+        <span class="logo-flood">FLOOD</span>
+        <span class="logo-dot">·</span>
+        <span class="logo-guard">GUARD</span>
+      </div>
+      <div class="logo-sub">ODS 11 · UPM · SISTEMA IoT DE ALERTA DE ENCHENTES</div>
+    </div>
+    <div class="header-right">
+      <div class="conn-badge offline" id="badge-wifi">
+        <div class="dot"></div>
+        <span id="badge-wifi-text">WIFI OFFLINE</span>
+      </div>
+      <div class="conn-badge offline" id="badge-mqtt">
+        <div class="dot"></div>
+        <span id="badge-mqtt-text">MQTT OFFLINE</span>
+      </div>
+      <div id="clock">--:--:--</div>
+      <button id="btn-theme" onclick="toggleTheme()"
+        style="background:var(--panel);border:1px solid var(--border2);color:var(--cyan);
+               font-family:var(--font-mono);font-size:.7rem;letter-spacing:.08em;
+               padding:6px 14px;border-radius:2px;cursor:pointer;transition:all .3s"
+        title="Alternar tema claro/escuro">
+        ☀ CLARO
+      </button>
+      <button id="btn-audio" onclick="toggleAudio()"
+        style="background:var(--panel);border:1px solid var(--border2);color:var(--green);
+               font-family:var(--font-mono);font-size:.7rem;letter-spacing:.08em;
+               padding:6px 14px;border-radius:2px;cursor:pointer;transition:all .2s"
+        title="Ligar/desligar alertas sonoros">
+        🔊 SOM ON
+      </button>
+    </div>
+  </header>
+
+  <!-- CONNECT BAR -->
+  <div class="connect-bar">
+    <div class="field medium">
+      <label>Broker MQTT</label>
+      <input id="inp-broker" value="broker.hivemq.com" placeholder="broker.hivemq.com">
+    </div>
+    <div class="field small">
+      <label>Porta WS</label>
+      <input id="inp-port" value="8000" placeholder="8000">
+    </div>
+    <div class="field">
+      <label>Tópico (use # para todos)</label>
+      <input id="inp-topic" value="floodguard/upm/sensor1/#" placeholder="floodguard/upm/sensor1/#">
+    </div>
+    <div class="field medium">
+      <label>Client ID</label>
+      <input id="inp-client" value="dashboard_web_001">
+    </div>
+    <div class="field small">
+      <label>Usuário</label>
+      <input id="inp-user" placeholder="opcional">
+    </div>
+    <div class="field small">
+      <label>Senha</label>
+      <input id="inp-pass" type="password" placeholder="opcional">
+    </div>
+    <button class="btn btn-connect" id="btn-connect" onclick="toggleConnect()">CONECTAR</button>
+    <button class="btn" style="background:var(--bg3);color:var(--text2);border:1px solid var(--border2);font-size:.7rem" onclick="injectTestData()" title="Simula dados do ESP32 para testar o dashboard">🧪 TESTAR</button>
+  </div>
+
+  <!-- STATUS BANNER (aguardando dados) -->
+  <div id="no-data">
+    <div class="no-data-icon">🌊</div>
+    <div>
+      <div class="no-data-title">AGUARDANDO DADOS DO ESP32</div>
+      <div class="no-data-sub">Preencha o broker, porta e tópico acima e clique em <strong style="color:var(--green)">CONECTAR</strong>. Os dados aparecerão automaticamente.</div>
+    </div>
+  </div>
+
+  <!-- ALERT BANNER -->
+  <div id="alert-banner">
+    <span id="alert-icon">⚠</span>
+    <span id="alert-text">NÍVEL DE ALERTA DETECTADO</span>
+  </div>
+
+  <!-- KPI ROW -->
+  <div class="kpi-row">
+    <div class="kpi" style="--accent:var(--cyan)">
+      <div class="kpi-label">Nível da Água</div>
+      <div class="kpi-value" id="kpi-nivel">--<span class="kpi-unit">%</span></div>
+      <div class="kpi-sub" id="kpi-nivel-sub">aguardando...</div>
+    </div>
+    <div class="kpi" style="--accent:var(--cyan2)">
+      <div class="kpi-label">Distância HC-SR04</div>
+      <div class="kpi-value" id="kpi-dist">--<span class="kpi-unit">cm</span></div>
+      <div class="kpi-sub">sensor ultrassônico</div>
+    </div>
+    <div class="kpi" style="--accent:var(--orange)">
+      <div class="kpi-label">Temperatura</div>
+      <div class="kpi-value" id="kpi-temp">--<span class="kpi-unit">°C</span></div>
+      <div class="kpi-sub">DHT11 · GPIO 2</div>
+    </div>
+    <div class="kpi" style="--accent:var(--cyan)">
+      <div class="kpi-label">Umidade Rel.</div>
+      <div class="kpi-value" id="kpi-hum">--<span class="kpi-unit">%</span></div>
+      <div class="kpi-sub">DHT11 · GPIO 2</div>
+    </div>
+    <div class="kpi" style="--accent:var(--green)">
+      <div class="kpi-label">WiFi RSSI</div>
+      <div class="kpi-value" id="kpi-rssi">--<span class="kpi-unit">dBm</span></div>
+      <div class="kpi-sub" id="kpi-rssi-q">—</div>
+    </div>
+  </div>
+
+  <!-- MAIN GRID -->
+  <div class="main-grid">
+
+    <!-- TANQUE -->
+    <div class="panel">
+      <div class="panel-title" style="--accent-line:var(--cyan)">Nível do Reservatório</div>
+      <div class="tank-wrap">
+        <div class="tank">
+          <div class="tank-outer" id="tank-outer">
+            <div class="tank-fill" id="tank-fill"></div>
+            <div class="tank-mark crit" style="bottom:80%; transform:translateY(50%)">80%</div>
+            <div class="tank-mark warn" style="bottom:50%; transform:translateY(50%)">50%</div>
+            <div class="tank-mark"     style="bottom:20%; transform:translateY(50%)">20%</div>
+          </div>
+        </div>
+        <div class="tank-info">
+          <div class="nivel-big" id="nivel-big">--</div>
+          <div style="display:flex;align-items:baseline;gap:4px">
+            <span class="nivel-pct" id="nivel-pct-sym" style="font-family:var(--font-cond);font-weight:700;font-size:1.8rem;color:var(--text2)">%</span>
+          </div>
+          <div class="nivel-label">NÍVEL RELATIVO</div>
+          <div class="dist-val">↕ <span id="dist-val">--</span> cm</div>
+          <div class="risk-bar-wrap">
+            <div class="risk-bar-label">BARRA DE RISCO</div>
+            <div class="risk-bar-track">
+              <div class="risk-bar-fill" id="risk-fill"></div>
+            </div>
+            <div class="risk-zones">
+              <div class="risk-z ok">NORMAL</div>
+              <div class="risk-z warn">ALERTA</div>
+              <div class="risk-z crit">CRÍTICO</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GRÁFICO -->
+    <div class="panel panel-chart">
+      <div class="panel-title" style="--accent-line:var(--green)">Histórico de Nível — Últimas 60 Leituras</div>
+      <div class="chart-container">
+        <canvas id="chart"></canvas>
+      </div>
+    </div>
+
+    <!-- SEMÁFORO + RGB -->
+    <div class="panel">
+      <div class="panel-title" style="--accent-line:var(--red)">Status de Alerta</div>
+      <div class="semaforo">
+        <div class="sem-light red" id="sem-red">CRIT</div>
+        <div class="sem-light yellow" id="sem-yellow">ALERT</div>
+        <div class="sem-light green active" id="sem-green">NORM</div>
+        <div class="status-text" id="status-text" style="color:var(--green)">NORMAL</div>
+      </div>
+      <div class="rgb-indicator">
+        <div class="rgb-label">RGB LED · GPIO 48</div>
+        <div class="rgb-dot" id="rgb-dot"></div>
+        <div class="rgb-mode-text" id="rgb-mode">—</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- BOTTOM GRID -->
+  <div class="bottom-grid">
+
+    <!-- SENSORES -->
+    <div class="panel">
+      <div class="panel-title" style="--accent-line:var(--cyan)">Sensores em Tempo Real</div>
+      <div class="sensor-row">
+        <div class="s-icon">🌊</div>
+        <div class="s-info">
+          <div class="s-name">HC-SR04 — NÍVEL</div>
+          <div class="s-bar-track"><div class="s-bar-fill" id="sb-nivel" style="background:var(--cyan);width:0%"></div></div>
+        </div>
+        <div class="s-val" id="sv-nivel" style="--accent2:var(--cyan)">--</div>
+      </div>
+      <div class="sensor-row">
+        <div class="s-icon">🌧</div>
+        <div class="s-info">
+          <div class="s-name">MH-RD — CHUVA (AO)</div>
+          <div class="s-bar-track"><div class="s-bar-fill" id="sb-chuva" style="background:var(--blue);width:0%"></div></div>
+        </div>
+        <div class="s-val" id="sv-chuva" style="--accent2:var(--blue)">--</div>
+      </div>
+      <div class="sensor-row">
+        <div class="s-icon">🌡</div>
+        <div class="s-info">
+          <div class="s-name">DHT11 — TEMPERATURA</div>
+          <div class="s-bar-track"><div class="s-bar-fill" id="sb-temp" style="background:var(--orange);width:0%"></div></div>
+        </div>
+        <div class="s-val" id="sv-temp" style="--accent2:var(--orange)">--</div>
+      </div>
+      <div class="sensor-row">
+        <div class="s-icon">💧</div>
+        <div class="s-info">
+          <div class="s-name">DHT11 — UMIDADE</div>
+          <div class="s-bar-track"><div class="s-bar-fill" id="sb-hum" style="background:var(--cyan2);width:0%"></div></div>
+        </div>
+        <div class="s-val" id="sv-hum" style="--accent2:var(--cyan2)">--</div>
+      </div>
+      <div class="sensor-row">
+        <div class="s-icon">📶</div>
+        <div class="s-info">
+          <div class="s-name">WiFi — RSSI</div>
+          <div class="s-bar-track"><div class="s-bar-fill" id="sb-rssi" style="background:var(--green);width:0%"></div></div>
+        </div>
+        <div class="s-val" id="sv-rssi" style="--accent2:var(--green)">--</div>
+      </div>
+    </div>
+
+    <!-- CONEXÃO / MQTT -->
+    <div class="panel">
+      <div class="panel-title" style="--accent-line:var(--blue)">Conectividade & MQTT</div>
+      <div class="conn-grid">
+        <div class="conn-card">
+          <div class="conn-card-label">WiFi Status</div>
+          <div class="pill" id="pill-wifi">OFFLINE</div>
+        </div>
+        <div class="conn-card">
+          <div class="conn-card-label">MQTT Broker</div>
+          <div class="pill" id="pill-mqtt">OFFLINE</div>
+        </div>
+        <div class="conn-card">
+          <div class="conn-card-label">Tópico</div>
+          <div class="conn-card-val" style="font-size:.6rem;color:var(--text2)" id="info-topic">—</div>
+        </div>
+        <div class="conn-card">
+          <div class="conn-card-label">IP do ESP32</div>
+          <div class="conn-card-val" id="info-ip">—</div>
+        </div>
+        <div class="conn-card">
+          <div class="conn-card-label">Dispositivo</div>
+          <div class="conn-card-val" id="info-dev" style="font-size:.6rem;color:var(--text2)">—</div>
+        </div>
+      </div>
+      <div style="margin-top:12px;">
+        <div class="stat-mini"><span class="stat-mini-label">Publicações recebidas</span><span class="stat-mini-val" id="stat-pub">0</span></div>
+        <div class="stat-mini"><span class="stat-mini-label">Uptime ESP32</span><span class="stat-mini-val" id="stat-uptime">—</span></div>
+        <div class="stat-mini"><span class="stat-mini-label">Última mensagem</span><span class="stat-mini-val" id="stat-last">—</span></div>
+        <div class="stat-mini"><span class="stat-mini-label">Chuva detectada</span><span class="stat-mini-val" id="stat-rain">—</span></div>
+      </div>
+      <div class="cmd-row">
+        <button class="btn-cmd" onclick="sendCmd('ping')">📡 PING</button>
+        <button class="btn-cmd danger" onclick="sendCmd('reset')">🔄 RESET ESP32</button>
+      </div>
+    </div>
+
+    <!-- LOG -->
+    <div class="panel">
+      <div class="panel-title" style="--accent-line:var(--green2)">Log de Mensagens MQTT</div>
+      <div class="log-wrap" id="log"></div>
+      <div style="margin-top:8px;display:flex;gap:8px;">
+        <button class="btn-cmd" onclick="clearLog()">LIMPAR LOG</button>
+        <button class="btn-cmd" onclick="exportLog()">⬇ EXPORTAR</button>
+      </div>
+    </div>
+
+  </div>
+
+</div><!-- .app -->
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  TEMA CLARO / ESCURO
+// ═══════════════════════════════════════════════════════════
+let isLight = false;
+
+function toggleTheme() {
+  isLight = !isLight;
+  applyTheme();
+  localStorage.setItem('fg_theme', isLight ? 'light' : 'dark');
+}
+
+function applyTheme() {
+  const root = document.documentElement;
+  const btn  = document.getElementById('btn-theme');
+  if (!btn) return;
+  if (isLight) {
+    root.classList.add('light');
+    btn.textContent = '🌙 ESCURO';
+  } else {
+    root.classList.remove('light');
+    btn.textContent = '☀ CLARO';
+  }
+  drawChart(); // redesenha gráfico com cores do tema atual
+}
+
+// ═══════════════════════════════════════════════════════════
+//  ESTADO GLOBAL
+// ═══════════════════════════════════════════════════════════
+let mqttClient   = null;
+let connected    = false;
+let msgCount     = 0;
+let chartHistory = new Array(60).fill(null);
+let chartCtx, chartCanvas;
+const logEntries = [];
+const MAX_LOG    = 100;
+
+// ═══════════════════════════════════════════════════════════
+//  SISTEMA DE ÁUDIO — Web Audio API (sem arquivos externos)
+// ═══════════════════════════════════════════════════════════
+let audioCtx      = null;
+let audioEnabled  = true;
+let lastAlertLevel = 'NORMAL';   // rastreia mudança de estado
+let critInterval  = null;        // loop do alarme crítico
+
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  // Retoma se suspenso (política do browser: precisa de interação do usuário)
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function toggleAudio() {
+  audioEnabled = !audioEnabled;
+  const btn = document.getElementById('btn-audio');
+  if (audioEnabled) {
+    btn.textContent = '🔊 SOM ON';
+    btn.style.color = 'var(--green)';
+    btn.style.borderColor = 'var(--green2)';
+    addLog('Alertas sonoros ATIVADOS', 'conn');
+  } else {
+    btn.textContent = '🔇 SOM OFF';
+    btn.style.color = 'var(--text2)';
+    btn.style.borderColor = 'var(--border2)';
+    stopCriticalAlarm();
+    addLog('Alertas sonoros desativados', 'alert');
+  }
+}
+
+// ── Toca um beep sintético ──────────────────────────────────
+// freq: Hz | duration: ms | type: sine/square/sawtooth/triangle
+// volume: 0.0–1.0 | delay: segundos a partir de agora
+function beep(freq, duration, type = 'sine', volume = 0.4, delay = 0) {
+  if (!audioEnabled) return;
+  try {
+    const ctx = getAudioCtx();
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.type      = type;
+    osc.frequency.setValueAtTime(freq, ctx.currentTime + delay);
+
+    // Envelope ADSR suave (evita cliques/pops)
+    const t0 = ctx.currentTime + delay;
+    const dur = duration / 1000;
+    gain.gain.setValueAtTime(0, t0);
+    gain.gain.linearRampToValueAtTime(volume, t0 + 0.01);
+    gain.gain.setValueAtTime(volume, t0 + dur - 0.05);
+    gain.gain.linearRampToValueAtTime(0, t0 + dur);
+
+    osc.start(t0);
+    osc.stop(t0 + dur);
+  } catch(e) { /* silencia erros de policy */ }
+}
+
+// ── Sons específicos por evento ─────────────────────────────
+
+// Conexão MQTT estabelecida: acorde ascendente suave
+function playConnected() {
+  beep(440, 120, 'sine', 0.25, 0.00);
+  beep(550, 120, 'sine', 0.25, 0.13);
+  beep(660, 200, 'sine', 0.30, 0.26);
+}
+
+// Desconexão: tom descendente
+function playDisconnected() {
+  beep(440, 150, 'sine', 0.20, 0.00);
+  beep(330, 250, 'sine', 0.20, 0.16);
+}
+
+// Transição → ALERTA: dois bips médios urgentes
+function playAlerta() {
+  beep(880, 180, 'square', 0.18, 0.00);
+  beep(880, 180, 'square', 0.18, 0.25);
+  beep(1100, 300, 'square', 0.20, 0.50);
+}
+
+// Transição → CRÍTICO: sirene com sweep de frequência
+function playCritico() {
+  if (!audioEnabled) return;
+  try {
+    const ctx  = getAudioCtx();
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sawtooth';
+
+    // Sweep 600 Hz → 1200 Hz em 0.4s (sirene)
+    const t0 = ctx.currentTime;
+    osc.frequency.setValueAtTime(600,  t0);
+    osc.frequency.linearRampToValueAtTime(1200, t0 + 0.4);
+    osc.frequency.linearRampToValueAtTime(600,  t0 + 0.8);
+
+    gain.gain.setValueAtTime(0,    t0);
+    gain.gain.linearRampToValueAtTime(0.30, t0 + 0.05);
+    gain.gain.setValueAtTime(0.30, t0 + 0.75);
+    gain.gain.linearRampToValueAtTime(0,    t0 + 0.8);
+
+    osc.start(t0);
+    osc.stop(t0 + 0.8);
+  } catch(e) {}
+}
+
+// Retorno ao NORMAL: acorde tranquilizador
+function playNormal() {
+  beep(660, 150, 'sine', 0.20, 0.00);
+  beep(550, 150, 'sine', 0.20, 0.16);
+  beep(440, 300, 'sine', 0.25, 0.32);
+}
+
+// Publicação MQTT: clique sutil (quase imperceptível)
+function playPub() {
+  beep(1200, 40, 'sine', 0.06, 0);
+}
+
+// ── Loop do alarme crítico (repete a cada 3s enquanto CRÍTICO) ──
+function startCriticalAlarm() {
+  stopCriticalAlarm();
+  playCritico();
+  critInterval = setInterval(() => {
+    if (audioEnabled) playCritico();
+  }, 3000);
+}
+function stopCriticalAlarm() {
+  if (critInterval) { clearInterval(critInterval); critInterval = null; }
+}
+
+// ── Dispara o som certo ao mudar de estado ──────────────────
+function handleAlertSound(newLevel) {
+  if (newLevel === lastAlertLevel) {
+    // Mesmo estado: só toca clique de pub (NORMAL) ou nada (ALERTA/CRÍTICO)
+    if (newLevel === 'NORMAL') playPub();
+    return;
+  }
+
+  const prev = lastAlertLevel;
+  lastAlertLevel = newLevel;
+
+  if (newLevel === 'CRITICO') {
+    startCriticalAlarm();
+    addLog('🔊 ALARME CRÍTICO ativado', 'crit');
+  } else if (newLevel === 'ALERTA') {
+    stopCriticalAlarm();
+    playAlerta();
+    addLog('🔊 Som de ALERTA', 'alert');
+  } else {
+    // NORMAL
+    stopCriticalAlarm();
+    if (prev !== 'NORMAL') playNormal();  // só toca ao retornar ao normal
+    else playPub();
+  }
+}
+function tick() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toLocaleTimeString('pt-BR', { hour12: false });
+}
+setInterval(tick, 1000); tick();
+
+// ═══════════════════════════════════════════════════════════
+//  GRÁFICO DE LINHA (Canvas puro — sem dependência)
+// ═══════════════════════════════════════════════════════════
+function initChart() {
+  chartCanvas = document.getElementById('chart');
+  chartCtx    = chartCanvas.getContext('2d');
+  const dpr   = window.devicePixelRatio || 1;
+  const rect  = chartCanvas.parentElement.getBoundingClientRect();
+  chartCanvas.width  = rect.width  * dpr;
+  chartCanvas.height = 220 * dpr;
+  chartCtx.scale(dpr, dpr);
+  chartCanvas.style.width  = rect.width  + 'px';
+  chartCanvas.style.height = '220px';
+  drawChart();
+}
+
+function drawChart() {
+  if (!chartCtx) return;
+  const W = chartCanvas.width  / (window.devicePixelRatio || 1);
+  const H = chartCanvas.height / (window.devicePixelRatio || 1);
+  const pad = { t: 10, r: 16, b: 30, l: 36 };
+  const gW  = W - pad.l - pad.r;
+  const gH  = H - pad.t - pad.b;
+
+  // Cores adaptadas ao tema
+  const light = document.documentElement.classList.contains('light');
+  const C = {
+    bg:       light ? '#f0f7f4' : '#040d0a',
+    grid:     light ? 'rgba(0,100,50,.12)' : 'rgba(20,51,38,.8)',
+    warn:     light ? 'rgba(180,112,0,.35)' : 'rgba(255,224,64,.2)',
+    crit:     light ? 'rgba(180,0,30,.35)'  : 'rgba(255,32,64,.2)',
+    line:     light ? 'rgba(0,120,60,.9)'   : 'rgba(0,232,122,.8)',
+    dot:      light ? '#007a40' : '#00e87a',
+    gradT:    light ? 'rgba(0,120,60,.20)'  : 'rgba(0,232,122,.25)',
+    gradB:    light ? 'rgba(0,120,60,0)'    : 'rgba(0,232,122,0)',
+    label:    light ? 'rgba(60,120,80,.7)'  : 'rgba(90,128,112,.6)',
+    warnLbl:  light ? 'rgba(150,90,0,.7)'   : 'rgba(255,224,64,.6)',
+    critLbl:  light ? 'rgba(160,0,20,.7)'   : 'rgba(255,32,64,.6)',
+  };
+
+  chartCtx.clearRect(0, 0, W, H);
+  chartCtx.fillStyle = C.bg;
+  chartCtx.fillRect(0, 0, W, H);
+
+  // Grid horizontal
+  const gridLevels = [0, 20, 50, 80, 100];
+  gridLevels.forEach(v => {
+    const y = pad.t + gH - (v / 100) * gH;
+    chartCtx.strokeStyle = v === 50 ? C.warn : v === 80 ? C.crit : C.grid;
+    chartCtx.lineWidth = v === 50 || v === 80 ? 1.5 : 1;
+    chartCtx.setLineDash(v === 50 || v === 80 ? [4,4] : []);
+    chartCtx.beginPath();
+    chartCtx.moveTo(pad.l, y);
+    chartCtx.lineTo(pad.l + gW, y);
+    chartCtx.stroke();
+    chartCtx.setLineDash([]);
+
+    // Rótulo Y
+    chartCtx.fillStyle = v === 50 ? C.warnLbl : v === 80 ? C.critLbl : C.label;
+    chartCtx.font = '10px "Share Tech Mono"';
+    chartCtx.textAlign = 'right';
+    chartCtx.fillText(v + '%', pad.l - 4, y + 4);
+  });
+
+  // Pontos válidos
+  const pts = chartHistory.map((v, i) => ({
+    x: pad.l + (i / (chartHistory.length - 1)) * gW,
+    y: v == null ? null : pad.t + gH - (Math.min(v, 100) / 100) * gH,
+    v
+  })).filter(p => p.y !== null);
+
+  if (pts.length < 2) return;
+
+  // Área preenchida
+  const grad = chartCtx.createLinearGradient(0, pad.t, 0, pad.t + gH);
+  grad.addColorStop(0,   C.gradT);
+  grad.addColorStop(0.6, C.gradB);
+  grad.addColorStop(1,   C.gradB);
+  chartCtx.beginPath();
+  chartCtx.moveTo(pts[0].x, pad.t + gH);
+  pts.forEach(p => chartCtx.lineTo(p.x, p.y));
+  chartCtx.lineTo(pts[pts.length - 1].x, pad.t + gH);
+  chartCtx.closePath();
+  chartCtx.fillStyle = grad;
+  chartCtx.fill();
+
+  // Linha principal
+  chartCtx.beginPath();
+  pts.forEach((p, i) => i === 0 ? chartCtx.moveTo(p.x, p.y) : chartCtx.lineTo(p.x, p.y));
+  chartCtx.strokeStyle = C.line;
+  chartCtx.lineWidth = 2;
+  chartCtx.lineJoin = 'round';
+  chartCtx.stroke();
+
+  // Ponto atual
+  const last = pts[pts.length - 1];
+  chartCtx.beginPath();
+  chartCtx.arc(last.x, last.y, 4, 0, Math.PI * 2);
+  chartCtx.fillStyle = C.dot;
+  chartCtx.fill();
+  chartCtx.strokeStyle = C.bg;
+  chartCtx.lineWidth = 2;
+  chartCtx.stroke();
+
+  // Eixo X (tempo)
+  chartCtx.fillStyle = C.label;
+  chartCtx.font = '9px "Share Tech Mono"';
+  chartCtx.textAlign = 'center';
+  [-60, -45, -30, -15, 0].forEach((s, i) => {
+    const x = pad.l + (i / 4) * gW;
+    chartCtx.fillText(s + 's', x, H - 6);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+//  MQTT — CONECTAR / DESCONECTAR
+// ═══════════════════════════════════════════════════════════
+function toggleConnect() {
+  if (connected) {
+    disconnect();
+  } else {
+    connectMQTT();
+  }
+}
+
+function connectMQTT() {
+  const broker   = document.getElementById('inp-broker').value.trim();
+  const port     = parseInt(document.getElementById('inp-port').value) || 8000;
+  const topic    = document.getElementById('inp-topic').value.trim();
+  const clientId = document.getElementById('inp-client').value.trim() || 'dashboard_' + Date.now();
+  const user     = document.getElementById('inp-user').value.trim();
+  const pass     = document.getElementById('inp-pass').value.trim();
+
+  const url = `ws://${broker}:${port}/mqtt`;
+  addLog(`Conectando a ${url}...`, 'conn');
+
+  const opts = {
+    clientId,
+    clean: true,
+    reconnectPeriod: 5000,
+    connectTimeout: 10000,
+  };
+  if (user) { opts.username = user; opts.password = pass; }
+
+  try {
+    mqttClient = mqtt.connect(url, opts);
+  } catch (e) {
+    addLog('Erro ao conectar: ' + e.message, 'crit');
+    return;
+  }
+
+  mqttClient.on('connect', () => {
+    connected = true;
+    document.getElementById('btn-connect').textContent = 'DESCONECTAR';
+    document.getElementById('btn-connect').classList.add('connected');
+    setBadge('mqtt', 'ok', 'MQTT OK');
+    document.getElementById('info-topic').textContent = topic;
+    mqttClient.subscribe(topic);
+    addLog(`Conectado · inscrito em: ${topic}`, 'conn');
+    document.getElementById('no-data').classList.add('hidden');
+    playConnected();
+  });
+
+  mqttClient.on('message', (t, rawPayload) => {
+    const txt = rawPayload.toString();
+
+    // Tópico /status publica texto simples ("online"/"offline") — não é JSON
+    if (t.includes('/status')) {
+      const online = txt === 'online';
+      setBadge('wifi', online ? 'ok' : 'err', online ? 'ESP32 ONLINE' : 'ESP32 OFFLINE');
+      addLog('Status ESP32: ' + txt, online ? 'conn' : 'alert');
+      return;
+    }
+
+    // Demais tópicos: JSON
+    try {
+      const d = JSON.parse(txt);
+      handleData(d, t);
+    } catch (e) {
+      addLog(`Mensagem não-JSON em ${t}: ${txt.slice(0, 80)}`, 'alert');
+    }
+  });
+
+  mqttClient.on('error', err => {
+    addLog('Erro MQTT: ' + err.message, 'crit');
+    setBadge('mqtt', 'err', 'ERRO');
+  });
+
+  mqttClient.on('offline', () => {
+    connected = false;
+    setBadge('mqtt', 'err', 'MQTT OFF');
+    addLog('MQTT desconectado', 'alert');
+    stopCriticalAlarm();
+    playDisconnected();
+  });
+
+  mqttClient.on('reconnect', () => {
+    addLog('Reconectando MQTT...', 'alert');
+    setBadge('mqtt', 'warn', 'RECONECT.');
+  });
+}
+
+function disconnect() {
+  if (mqttClient) { mqttClient.end(true); mqttClient = null; }
+  connected = false;
+  stopCriticalAlarm();
+  playDisconnected();
+  document.getElementById('btn-connect').textContent = 'CONECTAR';
+  document.getElementById('btn-connect').classList.remove('connected');
+  document.getElementById('no-data').classList.remove('hidden');
+  setBadge('mqtt', 'err', 'MQTT OFF');
+  setBadge('wifi', 'err', 'WIFI OFF');
+  addLog('Desconectado pelo usuário', 'alert');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  PROCESSAR DADOS DO ESP32
+// ═══════════════════════════════════════════════════════════
+function handleData(d, topic) {
+  msgCount++;
+  document.getElementById('stat-pub').textContent = msgCount;
+  document.getElementById('stat-last').textContent = new Date().toLocaleTimeString('pt-BR');
+
+  // Dados do sensor
+  const nivel = d.nivel_pct ?? null;
+  const dist  = d.dist_cm  ?? null;
+  const temp  = d.temp_c   ?? null;
+  const hum   = d.umidade  ?? null;
+  const rssi  = d.rssi     ?? null;
+  const chuva = d.chuva    ?? false;
+  const alert = (d.alerta  ?? 'NORMAL').toUpperCase();
+  const uptime= d.uptime_s ?? null;
+  const dev   = d.dispositivo ?? '—';
+  const rgbM  = d.rgb_mode ?? '—';
+  const rainA0= d.rain_a0  ?? 0;
+
+  // Badge WiFi: se recebemos dados, ESP está conectado
+  setBadge('wifi', 'ok', 'ESP32 OK');
+  if (msgCount === 1) addLog('✅ Primeiro pacote do ESP32 recebido!', 'conn');
+
+  // KPIs
+  if (nivel !== null) {
+    document.getElementById('kpi-nivel').innerHTML = `${nivel}<span class="kpi-unit">%</span>`;
+    document.getElementById('kpi-nivel-sub').textContent = alert;
+  }
+  if (dist  !== null) document.getElementById('kpi-dist').innerHTML  = `${dist.toFixed(0)}<span class="kpi-unit">cm</span>`;
+  if (temp  !== null) document.getElementById('kpi-temp').innerHTML  = `${temp.toFixed(1)}<span class="kpi-unit">°C</span>`;
+  if (hum   !== null) document.getElementById('kpi-hum').innerHTML   = `${hum.toFixed(0)}<span class="kpi-unit">%</span>`;
+  if (rssi  !== null) {
+    document.getElementById('kpi-rssi').innerHTML = `${rssi}<span class="kpi-unit">dBm</span>`;
+    const q = rssi > -60 ? '🟢 Excelente' : rssi > -70 ? '🟡 Bom' : rssi > -80 ? '🟠 Fraco' : '🔴 Crítico';
+    document.getElementById('kpi-rssi-q').textContent = q;
+  }
+
+  // Tanque
+  if (nivel !== null) {
+    const fillColor = alert === 'CRITICO' ? 'var(--red)' : alert === 'ALERTA' ? 'var(--yellow)' : 'var(--green)';
+    document.getElementById('tank-fill').style.height    = nivel + '%';
+    document.getElementById('tank-fill').style.setProperty('--fill-color', fillColor);
+    document.getElementById('tank-fill').style.background = `linear-gradient(to top, ${fillColor}, rgba(0,0,0,.2))`;
+    document.getElementById('nivel-big').textContent = nivel;
+    document.getElementById('nivel-big').style.color = fillColor;
+    document.getElementById('nivel-big').style.textShadow = `0 0 30px ${fillColor}`;
+    document.getElementById('dist-val').textContent   = dist ? dist.toFixed(0) : '--';
+    // Barra de risco
+    document.getElementById('risk-fill').style.width = nivel + '%';
+    document.getElementById('risk-fill').style.background = `linear-gradient(to right, var(--green), ${fillColor})`;
+  }
+
+  // Gráfico histórico
+  if (nivel !== null) {
+    chartHistory.push(nivel);
+    if (chartHistory.length > 60) chartHistory.shift();
+    drawChart();
+  }
+
+  // Semáforo
+  updateSemaforo(alert);
+
+  // RGB LED
+  updateRgbDot(rgbM, alert);
+  document.getElementById('rgb-mode').textContent = rgbM;
+
+  // Banner de alerta
+  const banner = document.getElementById('alert-banner');
+  if (alert === 'CRITICO') {
+    banner.className = 'critico';
+    document.getElementById('alert-icon').textContent = '🚨';
+    document.getElementById('alert-text').textContent = `NÍVEL CRÍTICO — ${nivel}% — RISCO DE ENCHENTE! EVACUAÇÃO IMEDIATA!`;
+  } else if (alert === 'ALERTA') {
+    banner.className = 'alerta';
+    document.getElementById('alert-icon').textContent = '⚠';
+    document.getElementById('alert-text').textContent = `NÍVEL DE ALERTA — ${nivel}% — Monitoramento intensificado.`;
+  } else {
+    banner.className = 'normal';
+  }
+
+  // Sensor rows
+  if (nivel !== null) { document.getElementById('sb-nivel').style.width = nivel + '%'; document.getElementById('sv-nivel').textContent = nivel + '%'; }
+  const rainPct = Math.round(rainA0 / 4095 * 100);
+  document.getElementById('sb-chuva').style.width = rainPct + '%';
+  document.getElementById('sv-chuva').textContent = chuva ? 'SIM 🌧' : 'NÃO';
+  if (temp !== null) { document.getElementById('sb-temp').style.width = Math.min(temp / 50 * 100, 100) + '%'; document.getElementById('sv-temp').textContent = temp.toFixed(1) + '°C'; }
+  if (hum  !== null) { document.getElementById('sb-hum').style.width  = hum + '%'; document.getElementById('sv-hum').textContent  = hum.toFixed(0) + '%'; }
+  if (rssi !== null) { const rp = Math.max(0, Math.min(100, (rssi + 100) / 60 * 100)); document.getElementById('sb-rssi').style.width = rp + '%'; document.getElementById('sv-rssi').textContent = rssi + ' dBm'; }
+
+  // Info MQTT
+  document.getElementById('pill-wifi').className  = 'pill ok';
+  document.getElementById('pill-wifi').textContent = 'ONLINE';
+  document.getElementById('pill-mqtt').className  = 'pill blue';
+  document.getElementById('pill-mqtt').textContent = 'RECEBENDO';
+  document.getElementById('info-ip').textContent   = d.ip ?? '—';
+  document.getElementById('info-dev').textContent  = dev;
+  document.getElementById('stat-rain').textContent = chuva ? '🌧 Detectada' : '☀ Nenhuma';
+
+  if (uptime !== null) {
+    const h = Math.floor(uptime / 3600);
+    const m = Math.floor((uptime % 3600) / 60);
+    const s = uptime % 60;
+    document.getElementById('stat-uptime').textContent =
+      `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
+
+  // Log + áudio
+  handleAlertSound(alert);
+  addLog(`nivel=${nivel}% dist=${dist?.toFixed(0)}cm t=${temp?.toFixed(0)}°C h=${hum?.toFixed(0)}% chuva=${chuva?'sim':'nao'} [${alert}]`, alert === 'CRITICO' ? 'crit' : alert === 'ALERTA' ? 'alert' : 'pub');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SEMÁFORO
+// ═══════════════════════════════════════════════════════════
+function updateSemaforo(alert) {
+  const sr = document.getElementById('sem-red');
+  const sy = document.getElementById('sem-yellow');
+  const sg = document.getElementById('sem-green');
+  const st = document.getElementById('status-text');
+
+  sr.classList.toggle('active', alert === 'CRITICO');
+  sy.classList.toggle('active', alert === 'ALERTA');
+  sg.classList.toggle('active', alert === 'NORMAL');
+
+  const colors = { NORMAL: 'var(--green)', ALERTA: 'var(--yellow)', CRITICO: 'var(--red)' };
+  st.textContent = alert;
+  st.style.color = colors[alert] || 'var(--green)';
+}
+
+// ═══════════════════════════════════════════════════════════
+//  LED RGB DOT
+// ═══════════════════════════════════════════════════════════
+function updateRgbDot(mode, alert) {
+  const dot = document.getElementById('rgb-dot');
+  const map = {
+    'BOOT':          ['#ffffff', '0 0 12px #fff'],
+    'WIFI_TRYING':   ['#00fff0', '0 0 12px #00fff0'],
+    'WIFI_OK':       ['#00c8c0', '0 0 10px #00c8c0'],
+    'MQTT_OK':       ['#0088ff', '0 0 14px #0088ff'],
+    'MQTT_PUB':      ['#44aaff', '0 0 18px #44aaff'],
+    'WIFI_LOST':     ['#ffe040', '0 0 10px #ffe040'],
+    'OFFLINE':       ['#ff00cc', '0 0 12px #ff00cc'],
+    'ALERT_NORMAL':  ['#00e87a', '0 0 10px #00e87a'],
+    'ALERT_ALERTA':  ['#ffe040', '0 0 12px #ffe040'],
+    'ALERT_CRITICO': ['#ff2040', '0 0 16px #ff2040'],
+  };
+  const def = alert === 'CRITICO' ? ['#ff2040','0 0 16px #ff2040'] :
+              alert === 'ALERTA'  ? ['#ffe040','0 0 12px #ffe040'] :
+                                    ['#00e87a','0 0 10px #00e87a'];
+  const [color, shadow] = map[mode] || def;
+  dot.style.background  = color;
+  dot.style.boxShadow   = shadow;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  BADGES DE CONEXÃO
+// ═══════════════════════════════════════════════════════════
+function setBadge(which, state, text) {
+  const el = document.getElementById('badge-' + which);
+  const tx = document.getElementById('badge-' + which + '-text');
+  el.className = 'conn-badge';
+  if (state === 'ok')   el.classList.add(which === 'mqtt' ? 'mqtt-ok' : 'wifi-ok');
+  else if (state === 'warn') el.classList.add('wifi-ok');
+  else el.classList.add('offline');
+  tx.textContent = text;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  LOG
+// ═══════════════════════════════════════════════════════════
+function addLog(msg, cls = '') {
+  const now = new Date().toLocaleTimeString('pt-BR', { hour12:false });
+  logEntries.push({ time: now, msg, cls });
+  if (logEntries.length > MAX_LOG) logEntries.shift();
+  renderLog();
+}
+
+function renderLog() {
+  const el = document.getElementById('log');
+  el.innerHTML = logEntries.map(e =>
+    `<div class="log-entry ${e.cls}">
+      <span class="log-time">${e.time}</span>
+      <span class="log-msg">${e.msg}</span>
+    </div>`
+  ).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+function clearLog() { logEntries.length = 0; document.getElementById('log').innerHTML = ''; }
+
+function exportLog() {
+  const txt = logEntries.map(e => `[${e.time}] ${e.msg}`).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(txt);
+  a.download = `floodguard_log_${new Date().toISOString().slice(0,10)}.txt`;
+  a.click();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  COMANDOS PARA O ESP32
+// ═══════════════════════════════════════════════════════════
+function sendCmd(cmd) {
+  if (!mqttClient || !connected) {
+    addLog('Sem conexão MQTT para enviar comando', 'alert'); return;
+  }
+  const topic = document.getElementById('inp-topic').value.replace('/#','').replace('/dados','') + '/cmd';
+  const payload = JSON.stringify({ cmd });
+  mqttClient.publish(topic, payload);
+  addLog(`CMD enviado → ${topic}: ${payload}`, 'conn');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  DADOS DE TESTE — simula ESP32 sem precisar de hardware
+// ═══════════════════════════════════════════════════════════
+let testInterval = null;
+let testNivel = 15;
+function injectTestData() {
+  document.getElementById('no-data').classList.add('hidden');
+  if (testInterval) { clearInterval(testInterval); testInterval = null; addLog('Simulação pausada', 'alert'); return; }
+  addLog('🧪 Simulação iniciada — dados falsos a cada 2s', 'conn');
+  testInterval = setInterval(() => {
+    testNivel = (testNivel + Math.random() * 6 - 2);
+    testNivel = Math.max(0, Math.min(100, testNivel));
+    const alertLevel = testNivel >= 80 ? 'CRITICO' : testNivel >= 50 ? 'ALERTA' : 'NORMAL';
+    const fake = {
+      dispositivo: 'ESP32_SIMULADO',
+      nivel_pct:   Math.round(testNivel),
+      dist_cm:     parseFloat((100 - testNivel).toFixed(1)),
+      chuva:       testNivel > 40,
+      rain_a0:     Math.round(testNivel / 100 * 4095),
+      temp_c:      parseFloat((22 + Math.random() * 8).toFixed(1)),
+      umidade:     parseFloat((55 + Math.random() * 20).toFixed(1)),
+      alerta:      alertLevel,
+      uptime_s:    msgCount * 2,
+      rssi:        -55 - Math.round(Math.random() * 20),
+      rgb_mode:    alertLevel === 'CRITICO' ? 'ALERT_CRITICO' : alertLevel === 'ALERTA' ? 'ALERT_ALERTA' : 'MQTT_OK',
+    };
+    handleData(fake, 'floodguard/upm/sensor1/dados');
+  }, 2000);
+}
+window.addEventListener('load', () => {
+  // Restaura tema salvo
+  const saved = localStorage.getItem('fg_theme');
+  if (saved === 'light') isLight = true;
+  applyTheme();
+
+  initChart();
+  window.addEventListener('resize', () => {
+    chartCanvas = null; chartCtx = null;
+    initChart();
+  });
+});
+</script>
+</body>
+</html>
